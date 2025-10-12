@@ -89,6 +89,7 @@ pub trait CallbackTrait: Send + Sync {
         &self,
         _device: &wgpu::Device,
         _queue: &wgpu::Queue,
+        _rect: &egui::Rect,
         _screen_descriptor: &ScreenDescriptor,
         _egui_encoder: &mut wgpu::CommandEncoder,
         _callback_resources: &mut CallbackResources,
@@ -937,7 +938,7 @@ impl Renderer {
                     }
                     Primitive::Callback(callback) => {
                         if let Some(c) = callback.callback.downcast_ref::<Callback>() {
-                            callbacks.push(c.0.as_ref());
+                            callbacks.push((&callback.rect, c.0.as_ref()));
                         } else {
                             log::warn!("Unknown paint callback: expected `egui_wgpu::Callback`");
                         }
@@ -1040,10 +1041,11 @@ impl Renderer {
         let mut user_cmd_bufs = Vec::new();
         {
             profiling::scope!("prepare callbacks");
-            for callback in &callbacks {
+            for (rect, callback) in &callbacks {
                 user_cmd_bufs.extend(callback.prepare(
                     device,
                     queue,
+                    rect,
                     screen_descriptor,
                     encoder,
                     &mut self.callback_resources,
@@ -1052,7 +1054,7 @@ impl Renderer {
         }
         {
             profiling::scope!("finish prepare callbacks");
-            for callback in &callbacks {
+            for (_rect, callback) in &callbacks {
                 user_cmd_bufs.extend(callback.finish_prepare(
                     device,
                     queue,
